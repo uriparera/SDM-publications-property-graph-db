@@ -1,0 +1,6 @@
+﻿*.xml*
+dblp.dtd
+*.zip
+output_dblp/
+SDM_toni/
+dblp.xml.gz
