@@ -76,6 +76,15 @@ DELETE old;
 LOAD CSV WITH HEADERS FROM 'file:///nodes_edition.csv' AS row FIELDTERMINATOR ';'
 MERGE (:Edition {id: row.`edition_id:ID`, city: row.`city:string`, year: toInteger(row.`year:int`)});
 
+// Add cities artificially to Editions
+// 1. Expanded list of 30 global tech and academic hubs
+WITH ["Barcelona", "Berlin", "San Francisco", "Tokyo", "London", "Paris", "New York", "Rome", "Singapore", "Montreal", "Madrid", "Amsterdam", "Zurich", "Beijing", "Seoul", "Sydney", "Toronto", "Boston", "Seattle", "Austin", "Dubai", "Mumbai", "Stockholm", "Copenhagen", "Munich", "Vienna", "Lisbon", "Dublin", "Chicago", "Los Angeles"] AS cities
+// 2. Match all your current Edition nodes
+MATCH (e:Edition)
+// 3. Pick a random index and assign the city
+WITH e, cities, toInteger(rand() * size(cities)) AS index
+SET e.city = cities[index];
+
 // 1. Create Journal and Volume nodes
 LOAD CSV WITH HEADERS FROM 'file:///nodes_journal.csv' AS row FIELDTERMINATOR ';'
 MERGE (:Journal {name: row.`name:ID`});
