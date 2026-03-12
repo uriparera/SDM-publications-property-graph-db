@@ -76,7 +76,6 @@ DELETE old;
 LOAD CSV WITH HEADERS FROM 'file:///nodes_edition.csv' AS row FIELDTERMINATOR ';'
 MERGE (:Edition {id: row.`edition_id:ID`, city: row.`city:string`, year: toInteger(row.`year:int`)});
 
-
 // 1. Create Journal and Volume nodes
 LOAD CSV WITH HEADERS FROM 'file:///nodes_journal.csv' AS row FIELDTERMINATOR ';'
 MERGE (:Journal {name: row.`name:ID`});
@@ -86,7 +85,13 @@ LOAD CSV WITH HEADERS FROM 'file:///nodes_conference.csv' AS row FIELDTERMINATOR
 MERGE (:Conference {name: row.`name:ID`});
 
 LOAD CSV WITH HEADERS FROM 'file:///nodes_volume.csv' AS row FIELDTERMINATOR ';'
-MERGE (:Volume {id: row.`volume_id:ID`, number: toInteger(row.`number:int`)});
+MERGE (:Volume {id: row.`volume_id:ID`, number: toInteger(row.`number:int`), year: toInteger(row.`year:int`)});
+
+// Or updating to add year
+LOAD CSV WITH HEADERS FROM 'file:///nodes_volume.csv' AS row FIELDTERMINATOR ';'
+MERGE (v:Volume {id: row.`volume_id:ID`})
+SET v.number = toInteger(row.`number:int`),
+    v.year = toInteger(row.`year:int`);
 
 // Link Inproceedings to Editions
 LOAD CSV WITH HEADERS FROM 'file:///rels_presented_at.csv' AS row FIELDTERMINATOR ';'
@@ -139,3 +144,13 @@ MATCH (p:Paper {id: row.`:START_ID`})
 MERGE (k:Keyword {word: row.`:END_ID`})
 // Finally, link them
 MERGE (p)-[:COVERS]->(k);
+
+// Update Articles
+LOAD CSV WITH HEADERS FROM 'file:///clean_articles.csv' AS row FIELDTERMINATOR ';'
+MATCH (p:Paper {id: row.`article:ID`})
+SET p.abstract = row.`abstract:string`;
+
+// Update Inproceedings
+LOAD CSV WITH HEADERS FROM 'file:///clean_inproceedings.csv' AS row FIELDTERMINATOR ';'
+MATCH (p:Paper {id: row.`inproceedings:ID`})
+SET p.abstract = row.`abstract:string`;

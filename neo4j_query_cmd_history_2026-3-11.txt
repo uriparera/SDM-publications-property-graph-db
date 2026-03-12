@@ -1,0 +1,73 @@
+// Update Journals
+MATCH (j:Journal)
+SET j.required_reviewers = 3;
+// Update Conferences
+MATCH (c:Conference)
+SET c.required_reviewers = 3;
+
+// Assign 2, 3, or 4 reviewers to Journals randomly (much better!)
+MATCH (j:Journal)
+SET j.required_reviewers = toInteger(rand() * 3) + 2;
+// Assign 2, 3, or 4 reviewers to Conferences randomly
+MATCH (c:Conference)
+SET c.required_reviewers = toInteger(rand() * 3) + 2;
+
+// Create a few sample organizations
+MERGE (o1:Organization {name: "Saltoki", type: "Company"})
+MERGE (o2:Organization {name: "UPC", type: "University"})
+MERGE (o3:Organization {name: "TU Delft", type: "University"})
+MERGE (o4:Organization {name: "BSC-CNS", type: "Company"})
+MERGE (o5:Organization {name: "Blanes University", type: "University"})
+MERGE (o6:Organization {name: "Sansa Institute", type: "University"})
+MERGE (o7:Organization {name: "BMW Group", type: "Company"})
+
+// Synthetically assign authors to organizations based on a hash of their name
+MATCH (a:Author)
+WITH a, size(a.name) % 3 AS rand_org
+MATCH (o:Organization)
+WITH a, o, rand_org
+// 0 goes to o1, 1 goes to o2, 2 goes to o3
+WHERE (rand_org = 0 AND o.name = "Tech University") OR 
+      (rand_org = 1 AND o.name = "Data Corp") OR 
+      (rand_org = 2 AND o.name = "Global Institute")
+MERGE (a)-[:AFFILIATED_WITH]->(o);
+
+// Or doing in randomly (much better!)
+// 1. Get all authors
+MATCH (a:Author)
+// 2. Get all organizations into a list
+MATCH (o:Organization)
+WITH a, collect(o) AS orgs
+// 3. Generate a random index based on the size of the list
+// rand() * size(list) gives a float, toInteger() drops the decimal
+WITH a, orgs, toInteger(rand() * size(orgs)) AS index
+// 4. Pick the organization at that index and link it
+WITH a, orgs[index] AS selected_org
+MERGE (a)-[:AFFILIATED_WITH]->(selected_org);
+
+MATCH ()-[r:HAS_REVIEWED]->()
+// Randomly assign True (Accept) or False (Reject)
+SET r.decision = rand() > 0.25, // acceptance probability set to 75%
+    r.content = "This is a synthetically generated review detailing methodology feedback.";
+
+// Create new property of a paper node
+MATCH (p:Paper)<-[r:HAS_REVIEWED]-()
+WITH p, count(r) AS total_reviews, sum(CASE WHEN r.decision = true THEN 1 ELSE 0 END) AS positive_reviews
+// Accept if positive reviews are more than half
+SET p.accepted = (positive_reviews > (total_reviews / 2.0));
+
+// This new property now takes into account the number of required reviewers by the venue!
+// 1. Calculate acceptance based on venue policy
+MATCH (p:Paper)-[:PUBLISHED_IN|PRESENTED_AT]->(venue_container)-[:BELONGS_TO]->(venue)
+MATCH (p)<-[r:HAS_REVIEWED]-()
+WITH p, venue, 
+     count(r) AS actual_reviews, 
+     sum(CASE WHEN r.decision = true THEN 1 ELSE 0 END) AS positive_reviews
+// 2. A paper is accepted ONLY IF it has enough reviews AND majority is positive
+SET p.accepted = (actual_reviews >= venue.required_reviewers AND 
+                  positive_reviews > (actual_reviews / 2.0));
+
+// To check
+MATCH (p:Paper)
+WHERE p.accepted IS NOT NULL
+RETURN p.accepted AS IsAccepted, count(p) AS TotalPapers
