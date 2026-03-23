@@ -1,0 +1,32 @@
+// 1. Find the top 3 most cited papers of each conference/workshop.
+// Papers with the most outgoing CITED_BY relations
+MATCH (p1:Paper)-[:CITED_BY]->(p2:Paper)
+WITH p1, count(p2) as citations
+ORDER BY citations DESC LIMIT 3
+MATCH (p1:Paper)-[:PRESENTED_AT]->(e:Edition)-[:BELONGS_TO]->(c:Conference)
+RETURN c.name, p1.title, citations;
+
+// Alternatively
+MATCH (c:Conference)<-[:BELONGS_TO]-(e:Edition)<-[:PRESENTED_AT]-(p1:Paper)
+MATCH (p1)<-[:CITED_BY]-(p2:Paper)
+WITH c, p1, count(p2) as citations
+ORDER BY citations DESC 
+WITH c, collect({title: p1.title, count: citations})[0..3] as Top3Papers
+UNWIND Top3Papers AS paper
+RETURN c.name AS Conference, paper.title AS Title, paper.count AS Citations;
+
+// General check
+MATCH (p1:Paper)-[:CITED_BY]->(p2:Paper)
+WITH p1, count(p2) as citations
+ORDER BY citations DESC
+RETURN p1.title, citations;
+
+// 2. For each conference/workshop find its community: i.e., those authors that have published papers on that conference/workshop in, at least, 4 different editions.
+
+MATCH (p:Paper)-[:WRITTEN_BY]->(a:Author)
+MATCH (p:Paper)-[:PRESENTED_AT]->(e:Edition)-[:BELONGS_TO]->(c:Conference)
+WITH c, a, COUNT(DISTINCT e) as ndist
+WHERE ndist >= 4
+RETURN c.name, a.name;
+
+// 3. 
