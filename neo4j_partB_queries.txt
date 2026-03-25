@@ -29,4 +29,47 @@ WITH c, a, COUNT(DISTINCT e) as ndist
 WHERE ndist >= 4
 RETURN c.name, a.name;
 
-// 3. 
+// 3. Find the impact factor of the journals in your graph.
+// Journals without publications do not appear if we do not MATCH (j1:Journal) at the beginning and do from there on OPTIONAL MATCH
+
+// total papers from actual year by each journal from previous 2 years
+MATCH (p1:Paper)-[:PUBLISHED_IN]->(v1:Volume)-[:BELONGS_TO]->(j1:Journal)
+WHERE p1.year IN [2023,2024] 
+WITH j1, collect(p1) as papers, count(p1) as total_papers
+
+// total citations of papers published by each journal
+UNWIND papers as p
+OPTIONAL MATCH (p)-[:CITED_BY]->(p2:Paper) 
+WHERE p2.year = 2025
+WITH j1, total_papers, count(p2) as total_citations
+
+// return computation of IF
+RETURN j1.name AS Journal, 
+       total_citations, 
+       total_papers, 
+       toFloat(total_citations) / total_papers AS ImpactFactor
+ORDER BY ImpactFactor DESC;
+
+// 4. Find the h-index of the authors in your graph.
+// largest h such that h articles have at least h citations each
+
+// Match Authors and their Papers
+MATCH (a:Author)<-[:WRITTEN_BY]-(p:Paper)
+
+// The first "Bridge": Count citations per paper
+OPTIONAL MATCH (p)-[:CITED_BY]->(citing:Paper)
+WITH a, p, count(citing) AS citations
+ORDER BY a.name, citations DESC // Crucial: Sort high to low
+
+// The second "Bridge": Collect counts into a sorted list
+WITH a, collect(citations) AS citationList
+
+// The "H-Index Logic": Compare value to its position (index)
+UNWIND range(0, size(citationList)-1) AS i
+WITH a, citationList, i
+WHERE citationList[i] >= (i + 1)
+
+// Return the maximum index that satisfied the condition
+RETURN a.name AS Author, max(i + 1) AS HIndex
+ORDER BY HIndex DESC;
+
