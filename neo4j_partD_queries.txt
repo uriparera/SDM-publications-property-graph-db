@@ -31,7 +31,29 @@ RETURN communityId, collect(gds.util.asNode(nodeId).name) AS Researchers
 ORDER BY size(Researchers) DESC
 LIMIT 5;
 
+// Triangle Counting
+
+CALL gds.graph.project(
+  'paperTriangleGraph',
+  'Paper',
+  {
+    CITED_BY: {
+      orientation: 'UNDIRECTED'
+    }
+  }
+);
+
+CALL gds.triangleCount.stream('paperTriangleGraph')
+YIELD nodeId, triangleCount
+WHERE triangleCount > 0
+RETURN gds.util.asNode(nodeId).title AS Paper, triangleCount
+ORDER BY triangleCount DESC
+LIMIT 10;
+
+
+
 // Clean-up!!!
 
 CALL gds.graph.drop('citationGraph');
 CALL gds.graph.drop('collaborationGraph');
+CALL gds.graph.drop('paperTriangleGraph');
