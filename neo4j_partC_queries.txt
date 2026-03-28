@@ -27,29 +27,18 @@ RETURN v.name AS Venue, total AS TotalPapers, countComm AS CommunityPapers; // o
 
 // Stage 3. Next, we want to identify the top papers of these conferences/workshops/journals. We need to find the 100 papers with the highest number of citations from papers of the database community). As a result we will obtain the top-100 papers of the database community.
 
-// a Gemini no li ha molat aquesta query que havia fet jo :(
 MATCH (v)-[:RELATED_TO]->(c:Community {name: "Database"})
-WHERE v:Conference OR v:Journal
-WITH v // retrieve venues related to such community
-MATCH (p2:Paper)-[:PRESENTED_AT|PUBLISHED_IN]->()-[:BELONGS_TO]->(v) // retrieve papers from such venues
-MATCH (p1:Paper)-[:CITED_BY]->(p2:Paper)
-WITH v, p1, COUNT(p2) as citations
+// p1 is the paper IN the database venue (The one we want to label)
+MATCH (p1:Paper)-[:PRESENTED_AT|PUBLISHED_IN]->()-[:BELONGS_TO]->(v)
+// p2 is any paper citing p1
+MATCH (p1)-[:CITED_BY]->(p2:Paper)
+// Ensure the citations come from the wider database community
+WHERE EXISTS { (p2)-[:PRESENTED_AT|PUBLISHED_IN]->()-[:BELONGS_TO]->()-[:RELATED_TO]->(c) }
+WITH p1, count(p2) AS citations 
 ORDER BY citations DESC
-WITH v, collect({p1, citations: citations})[0..100] as top100Papers
-UNWIND top100Papers as top100Paper
-SET top100Paper.isTop100 = True, top100Paper:TopPaper
+LIMIT 100 
+SET p1:TopPaper, p1.isTop100 = true 
 RETURN p1.title AS Title, citations AS Citations;
-
-MATCH (v)-[:RELATED_TO]->(c:Community {name: "Database"})
-MATCH (p1:Paper)-[:PRESENTED_AT|PUBLISHED_IN]->()-[:BELONGS_TO]->(v) // retrieve papers from such venues
-MATCH (p2:Paper)-[:CITED_BY]->(p1)
-WHERE EXISTS {MATCH (p2)-[:PRESENTED_AT|PUBLISHED_IN]->()-[:BELONGS_TO]->()-[:RELATED_TO]->(c)}
-// if we wrote belongs_to v, then only the citations from the same venue would count
-WITH p2, count(p1) AS citations 
-ORDER BY citations DESC
-LIMIT 100 // extract 100 first
-SET p2:TopPaper, p2.isTop100 = true // add new label to node and property, maybe one would be enough
-RETURN p2.title AS Title, citations AS Citations;
 
 // To remove any wrong query consequences 
 MATCH (p)
@@ -60,6 +49,10 @@ RETURN count(p) AS CleanedNodes;
 
 // Stage 4. Finally, an author of any of these top-100 papers is automatically considered a potential good match to review database papers, and we want to include this information in the graph. In addition, we want to identify and store gurus, i.e., reputable authors that would be able to review for top events or journals. Gurus are those authors of, at least, two papers among the top-100 identified.
 
+MATCH (a:Author)
+WHERE a:PotentialReviewer OR a:Guru
+REMOVE a:PotentialReviewer, a:Guru;
+
 MATCH (p:TopPaper)-[:WRITTEN_BY]->(a:Author)
 WITH a, count(p) AS writtenPapers
 SET a:PotentialReviewer
@@ -67,6 +60,7 @@ WITH a, writtenPapers
 WHERE writtenPapers >= 2 
 SET a:Guru
 RETURN a.name AS Author, writtenPapers;
+
 
 
 

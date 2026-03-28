@@ -1,0 +1,37 @@
+// PageRank
+
+CALL gds.graph.project(
+  'citationGraph',
+  'Paper',
+  'CITED_BY'
+);
+
+CALL gds.pageRank.stream('citationGraph')
+YIELD nodeId, score
+RETURN gds.util.asNode(nodeId).title AS Paper, score
+ORDER BY score DESC
+LIMIT 10;
+
+// Louvain
+
+CALL gds.graph.project(
+  'collaborationGraph',
+  ['Author', 'Paper'],
+  {
+    WRITTEN_BY: {
+      orientation: 'UNDIRECTED'
+    }
+  }
+);
+
+CALL gds.louvain.stream('collaborationGraph')
+YIELD nodeId, communityId
+WHERE 'Author' IN labels(gds.util.asNode(nodeId))
+RETURN communityId, collect(gds.util.asNode(nodeId).name) AS Researchers
+ORDER BY size(Researchers) DESC
+LIMIT 5;
+
+// Clean-up!!!
+
+CALL gds.graph.drop('citationGraph');
+CALL gds.graph.drop('collaborationGraph');

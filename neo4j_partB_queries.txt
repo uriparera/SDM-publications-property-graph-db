@@ -11,8 +11,8 @@ MATCH (c:Conference)<-[:BELONGS_TO]-(e:Edition)<-[:PRESENTED_AT]-(p1:Paper)
 MATCH (p1)<-[:CITED_BY]-(p2:Paper)
 WITH c, p1, count(p2) as citations
 ORDER BY citations DESC 
-WITH c, collect({title: p1.title, count: citations})[0..3] as Top3Papers
-UNWIND Top3Papers AS paper
+WITH c, collect({title: p1.title, count: citations})[0..3] as top3Papers
+UNWIND top3Papers AS paper
 RETURN c.name AS Conference, paper.title AS Title, paper.count AS Citations;
 
 // General check
